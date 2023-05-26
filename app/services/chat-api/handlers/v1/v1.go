@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"github.com/ardanlabs/service/foundation/web"
 	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/chat"
 	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/healthcheck"
+	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"
 	"net/http"
 )

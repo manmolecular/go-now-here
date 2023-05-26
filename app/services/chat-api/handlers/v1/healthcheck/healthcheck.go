@@ -3,7 +3,7 @@ package healthcheck
 
 import (
 	"context"
-	"github.com/ardanlabs/service/foundation/web"
+	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
