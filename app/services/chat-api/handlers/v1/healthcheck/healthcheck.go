@@ -4,16 +4,21 @@ package healthcheck
 import (
 	"context"
 	"github.com/ardanlabs/service/foundation/web"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 )
 
 // Handlers manages the set of healthcheck endpoints.
-type Handlers struct{}
+type Handlers struct {
+	Log *zap.SugaredLogger
+}
 
 // New constructs a Handlers api for the healthcheck group.
-func New() *Handlers {
-	return &Handlers{}
+func New(log *zap.SugaredLogger) *Handlers {
+	return &Handlers{
+		Log: log,
+	}
 }
 
 func (h *Handlers) Liveness(ctx context.Context, w http.ResponseWriter, r *http.Request) error {

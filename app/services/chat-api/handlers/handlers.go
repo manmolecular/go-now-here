@@ -33,7 +33,9 @@ func APIMux(cfg APIMuxConfig, options ...func(opts *Options)) http.Handler {
 		mid.Panics(),
 	)
 
-	v1.Routes(app, v1.Config{Log: cfg.Log})
+	v1.Routes(app, v1.Config{
+		Log: cfg.Log,
+	})
 
 	return app
 }

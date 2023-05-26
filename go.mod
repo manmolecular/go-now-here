@@ -6,6 +6,7 @@ require (
 	github.com/ardanlabs/conf/v3 v3.1.5
 	github.com/ardanlabs/service v0.0.0-20230526134044-27a1c8b9de2e
 	go.uber.org/zap v1.24.0
+	nhooyr.io/websocket v1.8.7
 )
 
 require (
@@ -26,6 +27,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgx/v5 v5.3.1 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
+	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/open-policy-agent/opa v0.52.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
