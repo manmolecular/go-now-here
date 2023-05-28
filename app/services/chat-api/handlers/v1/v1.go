@@ -23,5 +23,5 @@ func Routes(app *web.App, cfg Config) {
 	wsChat := chat.New(cfg.Log)
 
 	app.Handle(http.MethodGet, version, "/liveness", health.Liveness)
-	app.Handle(http.MethodGet, version, "/ws/chat", wsChat.Chat)
+	app.Handle(http.MethodGet, version, "/ws/chat", wsChat.Subscribe)
 }
