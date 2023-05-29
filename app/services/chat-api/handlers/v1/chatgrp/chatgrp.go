@@ -36,6 +36,11 @@ type subscriber struct {
 	messages chan any
 }
 
+// message represents a message.
+type message struct {
+	Content string `json:"content"`
+}
+
 // Handlers manages the set of chat endpoints.
 type Handlers struct {
 	log *zap.SugaredLogger
@@ -157,10 +162,11 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 				h.log.Debugw("read context is done", "subscriberId", s.id)
 				return
 			default:
-				var message interface{}
-				if err := wsjson.Read(ctx, conn, &message); err != nil {
+				var msg interface{}
+				if err := wsjson.Read(ctx, conn, &msg); err != nil {
 					if errors.As(err, &websocket.CloseError{}) {
 						h.log.Warnw("client closed the connection", "error", err, "subscriberId", s.id)
+						// TODO: publish notification for its pair that the client is disconnected
 					} else {
 						h.log.Errorw("unexpected error while reading a message", "error", err, "subscriberId", s.id)
 					}
@@ -171,8 +177,8 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 					continue
 				}
 
-				h.log.Debugw("read message from a subscriber", "message", message, "subscriberId", s.id)
-				h.publishMessage(message, s)
+				h.log.Debugw("read message from a subscriber", "message", msg, "subscriberId", s.id)
+				h.publishMessage(msg, s)
 			}
 		}
 	}()
@@ -185,9 +191,9 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 	go func() {
 		for {
 			select {
-			case message := <-s.messages:
-				h.log.Debugw("write message to a subscriber", "message", message, "subscriberId", s.id)
-				if err := wsjson.Write(ctx, conn, message); err != nil {
+			case msg := <-s.messages:
+				h.log.Debugw("write message to a subscriber", "message", msg, "subscriberId", s.id)
+				if err := wsjson.Write(ctx, conn, msg); err != nil {
 					h.log.Warnw("no new messages to write", "error", err, "subscriberId", s.id)
 				}
 			case <-ctx.Done():
@@ -198,6 +204,13 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 	}()
 }
 
+// notifySubscriber notifies subscriber about any service-related actions
+func (h *Handlers) notifySubscriber(ctx context.Context, conn *websocket.Conn, sId string, msg string) {
+	if err := wsjson.Write(ctx, conn, &message{Content: msg}); err != nil {
+		h.log.Warnw("subscriber can not be notified", "error", err, "subscriberId", sId)
+	}
+}
+
 // Subscribe subscribes a client to the message channel to read and write messages from it
 func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	// Accept connection from the client
@@ -205,6 +218,8 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	if err != nil {
 		return err
 	}
+
+	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	s := &subscriber{
 		id:       r.RemoteAddr,
@@ -214,16 +229,22 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	h.addSubscriber(s)
 	defer h.deleteSubscriber(s)
 
+	h.notifySubscriber(ctx, conn, s.id, "wait for any available client to chat with...")
+
 	// Assign a pair to chat with.
 	// When pair is successfully assigned, we can read messages from the pair and write messages to the pair
 	if err = h.assignSubscriberPair(ctx, s); err != nil {
 		h.log.Debugw("no subscriber pair is available", "subscriberId", s.id, "error", err)
+		h.notifySubscriber(ctx, conn, s.id, "no available clients to chat with; please, try again later.")
+
 		if err = conn.Close(websocket.StatusTryAgainLater, "no available subscribers"); err != nil {
 			h.log.Warnw("socket connection can not be closed", "error", err, "subscriberId", s.id)
 		}
 
 		return nil
 	}
+
+	h.notifySubscriber(ctx, conn, s.id, "available client is found.")
 
 	// Read messages in a goroutine, ctx will be canceled if client closed the connection
 	ctx = h.readMessages(ctx, conn, s)

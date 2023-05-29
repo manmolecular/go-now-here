@@ -3,23 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <title>Chat with a random person</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Indie+Flower">
 </head>
 <style>
     label, span {
         display: block;
-        font: 1rem 'Fira Sans', sans-serif;
+        font: 1rem 'Arial Hebrew Scholar', sans-serif;
     }
 
-    input,
     label {
+        font: 2rem 'Indie Flower', normal;
         margin: 0.4rem 0;
+        font-weight: bold;
     }
+
+    html, body{
+        height: 100%;
+    }
+
+    .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+    }
+
+    .subcontainer {
+        width: 450px;
+        margin: 0 auto;
+    }
+
+    #message {
+        width: 310px;
+    }
+
+    #message-history {
+        height: 205px;
+        max-height: 205px;
+        overflow: hidden;
+    }
+
 </style>
 <script>
+    const scrollToBottom = (id) => {
+        const element = document.getElementById(id);
+        element.scrollTop = element.scrollHeight;
+    }
+
     function writeMessageToHistory(message, direction) {
         let span = document.createElement("span");
         span.textContent = `${direction} ${message}`;
+
         document.getElementById("message-history").appendChild(span);
+        scrollToBottom("message-history")
     }
 
     window.addEventListener("DOMContentLoaded", function() {
@@ -30,8 +66,8 @@
             document.getElementById("message-form").addEventListener("submit", function(e) {
                 e.preventDefault();
                 let msg = document.getElementById("message").value;
-                socket.send(`{"message": "${msg}"}`);
-                writeMessageToHistory(msg, ">>");
+                socket.send(`{"content": "${msg}"}`);
+                writeMessageToHistory(msg, "you: ");
                 document.getElementById("message").value = '';
             });
         });
@@ -39,19 +75,23 @@
         // Listen for messages
         socket.addEventListener("message", (event) => {
             console.log("Received message from server ", event.data);
-            writeMessageToHistory(JSON.parse(event.data).message, "<<");
+            writeMessageToHistory(JSON.parse(event.data).content, "stranger: ");
         });
     });
 </script>
 <body>
-    <label for="message-history">Messages:</label>
-    <div id="message-history">
+    <div class="container">
+        <div class="subcontainer">
+            <label for="message-history">Message History</label>
+            <div class="message-history" id="message-history">
 
+            </div>
+            <form id="message-form">
+                <label for="message">Your message</label>
+                <input type="text" id="message" name="message" required minlength="1" maxlength="140" size="10">
+                <input type="submit" value="send">
+            </form>
+        </div>
     </div>
-    <form id="message-form">
-        <label for="message">Your message:</label>
-        <input type="text" id="message" name="message" required minlength="1" maxlength="140" size="10">
-        <input type="submit" value="send">
-    </form>
 </body>
 </html>
