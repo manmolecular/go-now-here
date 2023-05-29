@@ -4,6 +4,7 @@ package chatgrp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 	"net/http"
@@ -24,7 +25,7 @@ const (
 	publishLimiterMilliseconds = 100
 
 	// checkSubAvailabilityMilliseconds defines rate of available subscribers checking interval
-	checkSubAvailabilityMilliseconds = 500
+	checkSubAvailabilityMilliseconds = 1_000
 
 	// checkSubAvailabilityMaxTimeSeconds defines how long can we wait for an available subscriber
 	checkSubAvailabilityMaxTimeSeconds = 5
@@ -69,22 +70,24 @@ func New(log *zap.SugaredLogger) *Handlers {
 }
 
 // publishMessage publishes a message to the message channel of a paired subscriber.
-func (h *Handlers) publishMessage(msg any, s *subscriber) {
+func (h *Handlers) publishMessage(msg any, s *subscriber) error {
 	h.subscribersMu.Lock()
 	defer h.subscribersMu.Unlock()
 
 	if err := h.publishLimiter.Wait(context.Background()); err != nil {
-		h.log.Warnw("message can not be published", "subscriberId", s.id, "error", err, "reason", "rate")
-		return
+		return fmt.Errorf("message %s can not be published, limiter error: %w", msg, err)
 	}
 
 	// Message must be published to the paired subscriber only
 	sAnother, ok := h.subscribers[s.pairId]
 	if !ok {
-		h.log.Warnw("message can not be published", "subscriberId", s.id, "error", errors.New("no corresponding pair"), "reason", "noPair")
-		return
+		return fmt.Errorf("message %s can not be published, no available pair to send message", msg)
 	}
+
 	sAnother.messages <- msg
+	h.log.Debugw("message sent successfully", "subscriberId", s.id, "anotherId", sAnother.id)
+
+	return nil
 }
 
 // linkSubscribersById links two available subscribers with each other as a pair.
@@ -95,7 +98,7 @@ func (h *Handlers) linkSubscribersById(sId, anotherId string) {
 	h.subscribers[anotherId].pairId = sId
 	h.subscribers[sId].pairId = anotherId
 
-	h.log.Debugw("link two subscribers in a pair",
+	h.log.Debugw("successfully linkeds two subscribers in a pair",
 		"subscriberId", h.subscribers[sId].id,
 		"subscriberPairId", h.subscribers[sId].pairId,
 		"anotherId", h.subscribers[anotherId].id,
@@ -144,11 +147,11 @@ func (h *Handlers) assignAvailableSubscriber(ctx context.Context, s *subscriber)
 
 	select {
 	case <-isFound:
-		h.log.Debugw("pair is found", "subscriberId", s.id, "status", "success")
+		h.log.Debugw("pair was found", "subscriberId", s.id, "status", "success")
 		return nil
 	case <-time.After(checkSubAvailabilityMaxTimeSeconds * time.Second):
-		h.log.Debugw("pair was not found, time out reached", "subscriberId", s.id, "status", "failure")
-		return errors.New("pair search timeout")
+		h.log.Debugw("pair search time out reached", "subscriberId", s.id, "status", "failure")
+		return errors.New("pair search time out reached")
 	}
 }
 
@@ -161,20 +164,17 @@ func (h *Handlers) addSubscriber(s *subscriber) {
 
 // deleteSubscriber deletes the given subscriber.
 func (h *Handlers) deleteSubscriber(s *subscriber) {
-	sAnother, ok := h.subscribers[s.pairId]
-	if ok {
-		h.publishMessage(&message{Content: "your client is disconnected; please, start over."}, s)
-	}
-
 	h.subscribersMu.Lock()
 	defer h.subscribersMu.Unlock()
 
 	// If the current subscriber has a pair, make the pair available for a new subscriber (since the current is not
 	// active anymore). Otherwise, subscriber was not able to find a pair, so nothing to delete here
+	sAnother, ok := h.subscribers[s.pairId]
 	if ok {
 		sAnother.pairId = ""
 		h.log.Debugw("pair subscriber is free now", "subscriberId", s.id, "subscriberPairId", s.pairId)
 	}
+
 	delete(h.subscribers, s.id)
 }
 
@@ -192,20 +192,23 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 				var msg interface{}
 				if err := wsjson.Read(ctx, conn, &msg); err != nil {
 					if errors.As(err, &websocket.CloseError{}) {
-						h.log.Warnw("client closed the connection", "error", err, "subscriberId", s.id)
-						// TODO: publish notification for its pair that the client is disconnected
-					} else {
-						h.log.Errorw("unexpected error while reading a message", "error", err, "subscriberId", s.id)
+						h.log.Warnw("message can not be read, client closed the connection", "subscriberId", s.id)
+						cancel()
+						continue
 					}
 
-					// TODO: handle other possible types of websocket errors
-
-					cancel()
+					h.log.Warnw("message can not be read due to error", "subscriberId", s.id, "error", err)
+					// Skip this message, try to take the next one
 					continue
 				}
 
-				h.log.Debugw("read message from a subscriber", "message", msg, "subscriberId", s.id)
-				h.publishMessage(msg, s)
+				h.log.Debugw("read message from a subscriber", "subscriberId", s.id, "message", msg)
+
+				if err := h.publishMessage(msg, s); err != nil {
+					h.log.Warnw("message can not be published due to error", "subscriberId", s.id, "error", err)
+					// Skip this message, try to take the next one
+					continue
+				}
 			}
 		}
 	}()
@@ -219,9 +222,11 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 		for {
 			select {
 			case msg := <-s.messages:
-				h.log.Debugw("write message to a subscriber", "message", msg, "subscriberId", s.id)
+				h.log.Debugw("write message to a subscriber", "subscriberId", s.id, "message", msg)
 				if err := wsjson.Write(ctx, conn, msg); err != nil {
-					h.log.Warnw("no new messages to write", "error", err, "subscriberId", s.id)
+					h.log.Warnw("message can not be written due to error", "subscriberId", s.id, "error", err)
+					// Skip this message, try to take the next one
+					continue
 				}
 			case <-ctx.Done():
 				h.log.Debugw("write context is done", "subscriberId", s.id)
