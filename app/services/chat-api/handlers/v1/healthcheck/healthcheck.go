@@ -11,13 +11,13 @@ import (
 
 // Handlers manages the set of healthcheck endpoints.
 type Handlers struct {
-	Log *zap.SugaredLogger
+	log *zap.SugaredLogger
 }
 
 // New constructs a Handlers api for the healthcheck group.
 func New(log *zap.SugaredLogger) *Handlers {
 	return &Handlers{
-		Log: log,
+		log: log,
 	}
 }
 
