@@ -18,7 +18,7 @@ import (
 const prefix = "chat"
 
 func main() {
-	log, err := zap.NewProduction()
+	log, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

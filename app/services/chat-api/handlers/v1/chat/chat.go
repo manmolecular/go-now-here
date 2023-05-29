@@ -55,62 +55,69 @@ func (h *Handlers) publish(message any, s *subscriber) {
 	defer h.subscribersMu.Unlock()
 
 	if err := h.publishLimiter.Wait(context.Background()); err != nil {
-		h.Log.Warnf("message can not be published, details: %v", err)
+		h.Log.Warnw("message can not be published", "subscriberId", s.id, "error", err)
 	}
 
-	// Message should be published to the exact paired subscriber
+	// Message should be published to the paired subscriber only
 	h.subscribers[s.pairId].messages <- message
 }
 
-// assignSubscriberPair looks for a matching pair to a new subscriber every second
+// assignSubscriberPair searches for an available pair for a new subscriber.
 func (h *Handlers) assignSubscriberPair(ctx context.Context, s *subscriber) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
 	isFound := make(chan bool, 1)
 
 	go func() {
-		h.Log.Infof("searching for a pair to assign for a subscriber: %s", s.id)
+		for range ticker.C {
+			// If subscriber already received a pair - success, chat is possible
+			if s.pairId != "" {
+				h.Log.Debugw("pair for a subscriber is found", "subscriberId", s.id, "pairId", s.pairId, "status", "success")
+				isFound <- true
+				return
+			}
 
-		for range time.Tick(1 * time.Second) {
 			select {
+			case <-ctx.Done():
+				h.Log.Debugw("pair search is finished (found or timed out)", "subscriberId", s.id, "reason", "foundOrTimeout")
+				return
 			default:
-				// If subscriber already has an assigned pair - condition is met, chat is possible
-				if h.subscribers[s.id].pairId != "" {
-					h.Log.Infof("success, pair is found: %s", h.subscribers[s.id].pairId)
-					isFound <- true
-				}
+				h.Log.Debugw("searching for a pair to assign for a subscriber", "subscriberId", s.id, "status", "inProgress")
 
 				for idAnother, sAnother := range h.subscribers {
-					// If another pair is not available or another pair is the current subscriber - continue search
+					// If another pair is assigned or another pair is the current subscriber - continue search
 					if sAnother.pairId != "" || idAnother == s.id {
 						continue
 					}
+
+					// Available pair is found, assign it
 					h.subscribersMu.Lock()
 					h.subscribers[idAnother].pairId = s.id
 					h.subscribers[s.id].pairId = idAnother
 					h.subscribersMu.Unlock()
-					h.Log.Infof(
-						"success, pairs are assigned:(%s, %s) <-> (%s, %s)",
-						h.subscribers[idAnother].id, h.subscribers[idAnother].pairId,
-						h.subscribers[s.id].id, h.subscribers[s.id].pairId,
-					)
+					h.Log.Debugw("pairs for subscribers are assigned",
+						"subscriberId", h.subscribers[s.id].id,
+						"subscriberPairId", h.subscribers[s.id].pairId,
+						"anotherId", h.subscribers[idAnother].id,
+						"anotherPairId", h.subscribers[idAnother].pairId,
+						"status", "success")
 					isFound <- true
 				}
-			case <-ctx.Done():
-				h.Log.Info("pair searching is finished")
-				return
 			}
 		}
 	}()
 
 	select {
 	case <-isFound:
-		h.Log.Info("success, stop pair searching")
+		h.Log.Debugw("pair is found", "subscriberId", s.id, "status", "success")
 		return nil
 	case <-time.After(5 * time.Second):
-		h.Log.Info("pair was not found, time out reached")
-		return errors.New("pair searching timeout")
+		h.Log.Debugw("pair was not found, time out reached", "subscriberId", s.id, "status", "failure")
+		return errors.New("pair search timeout")
 	}
 }
 
@@ -136,15 +143,15 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 		for {
 			select {
 			case <-ctx.Done():
-				h.Log.Warnf("read context is done")
+				h.Log.Debugw("read context is done", "subscriberId", s.id)
 				return
 			default:
 				var message interface{}
 				if err := wsjson.Read(ctx, conn, &message); err != nil {
 					if errors.As(err, &websocket.CloseError{}) {
-						h.Log.Warnf("client closed the connection, details: %v", err)
+						h.Log.Warnw("client closed the connection", "error", err, "subscriberId", s.id)
 					} else {
-						h.Log.Errorf("unexpected error while reading a message: %v", err)
+						h.Log.Errorw("unexpected error while reading a message", "error", err, "subscriberId", s.id)
 					}
 
 					// TODO: handle other possible types of websocket errors
@@ -153,7 +160,7 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 					continue
 				}
 
-				h.Log.Infof("read message from a client: %v", message)
+				h.Log.Debugw("read message from a subscriber", "message", message, "subscriberId", s.id)
 				h.publish(message, s)
 			}
 		}
@@ -168,12 +175,12 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 		for {
 			select {
 			case message := <-s.messages:
-				h.Log.Infof("write message to a client: %v", message)
+				h.Log.Debugw("write message to a subscriber", "message", message, "subscriberId", s.id)
 				if err := wsjson.Write(ctx, conn, message); err != nil {
-					h.Log.Errorf("no new messages to write: %v", err)
+					h.Log.Warnw("no new messages to write", "error", err, "subscriberId", s.id)
 				}
 			case <-ctx.Done():
-				h.Log.Warnf("write context is done")
+				h.Log.Debugw("write context is done", "subscriberId", s.id)
 				return
 			}
 		}
@@ -199,8 +206,11 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	// Assign a pair to chat with.
 	// When pair is successfully assigned, we can read messages from the pair and write messages to the pair
 	if err = h.assignSubscriberPair(ctx, s); err != nil {
-		h.Log.Warn("no subscriber pair is available")
-		conn.Close(websocket.StatusTryAgainLater, "no available subscribers")
+		h.Log.Debugw("no subscriber pair is available", "subscriberId", s.id, "error", err)
+		if err = conn.Close(websocket.StatusTryAgainLater, "no available subscribers"); err != nil {
+			h.Log.Warnw("socket connection can not be closed", "error", err, "subscriberId", s.id)
+		}
+
 		return nil
 	}
 
