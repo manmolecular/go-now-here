@@ -18,7 +18,9 @@ import (
 const prefix = "chat"
 
 func main() {
-	log, err := zap.NewDevelopment()
+	logConfig := zap.NewDevelopmentConfig()
+	logConfig.DisableStacktrace = true
+	log, err := logConfig.Build(zap.WithCaller(true))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
