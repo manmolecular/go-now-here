@@ -97,7 +97,7 @@ func run(log *zap.SugaredLogger) error {
 
 	// Handle server interruptions
 	select {
-	case err := <-serverErrors:
+	case err = <-serverErrors:
 		return fmt.Errorf("server error: %w", err)
 	case sig := <-shutdown:
 		log.Infow("shutdown", "status", "shutdown started", "signal", sig)

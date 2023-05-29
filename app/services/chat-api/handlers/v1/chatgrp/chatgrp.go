@@ -24,7 +24,7 @@ const (
 	publishLimiterMilliseconds = 100
 
 	// checkSubAvailabilityMilliseconds defines rate of available subscribers checking interval
-	checkSubAvailabilityMilliseconds = 100
+	checkSubAvailabilityMilliseconds = 500
 
 	// checkSubAvailabilityMaxTimeSeconds defines how long can we wait for an available subscriber
 	checkSubAvailabilityMaxTimeSeconds = 5
@@ -75,10 +75,16 @@ func (h *Handlers) publishMessage(msg any, s *subscriber) {
 
 	if err := h.publishLimiter.Wait(context.Background()); err != nil {
 		h.log.Warnw("message can not be published", "subscriberId", s.id, "error", err, "reason", "rate")
+		return
 	}
 
 	// Message must be published to the paired subscriber only
-	h.subscribers[s.pairId].messages <- msg
+	sAnother, ok := h.subscribers[s.pairId]
+	if !ok {
+		h.log.Warnw("message can not be published", "subscriberId", s.id, "error", errors.New("no corresponding pair"), "reason", "noPair")
+		return
+	}
+	sAnother.messages <- msg
 }
 
 // linkSubscribersById links two available subscribers with each other as a pair.
@@ -155,16 +161,21 @@ func (h *Handlers) addSubscriber(s *subscriber) {
 
 // deleteSubscriber deletes the given subscriber.
 func (h *Handlers) deleteSubscriber(s *subscriber) {
+	sAnother, ok := h.subscribers[s.pairId]
+	if ok {
+		h.publishMessage(&message{Content: "your client is disconnected; please, start over."}, s)
+	}
+
 	h.subscribersMu.Lock()
-	// Make a pair of the subscriber available for a new pairs assignment
-	if _, ok := h.subscribers[s.pairId]; ok {
+	defer h.subscribersMu.Unlock()
+
+	// If the current subscriber has a pair, make the pair available for a new subscriber (since the current is not
+	// active anymore). Otherwise, subscriber was not able to find a pair, so nothing to delete here
+	if ok {
+		sAnother.pairId = ""
 		h.log.Debugw("pair subscriber is free now", "subscriberId", s.id, "subscriberPairId", s.pairId)
-		h.subscribers[s.pairId].pairId = ""
 	}
 	delete(h.subscribers, s.id)
-	h.subscribersMu.Unlock()
-
-	_ = h.assignAvailableSubscriber(context.Background(), h.subscribers[s.pairId])
 }
 
 // readMessages reads messages from a client and publish them to the message channel when available.
@@ -251,7 +262,7 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	// When pair is successfully assigned, we can read messages from the pair and write messages to the pair
 	if err = h.assignAvailableSubscriber(ctx, s); err != nil {
 		h.log.Debugw("no subscriber pair is available", "subscriberId", s.id, "error", err)
-		h.notifySubscriber(ctx, conn, s.id, "no available clients to chat with; please, try again later.")
+		h.notifySubscriber(ctx, conn, s.id, "no available clients to chat with; please, reload the page and try again later.")
 
 		if err = conn.Close(websocket.StatusTryAgainLater, "no available subscribers"); err != nil {
 			h.log.Warnw("socket connection can not be closed", "error", err, "subscriberId", s.id)
