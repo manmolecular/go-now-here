@@ -1,5 +1,5 @@
-// Package chat maintains the group of handlers for chat handling via websockets.
-package chat
+// Package chatgrp chat maintains the group of handlers for chat handling via websockets.
+package chatgrp
 
 import (
 	"context"
@@ -78,7 +78,7 @@ func (h *Handlers) assignSubscriberPair(ctx context.Context, s *subscriber) erro
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	ticker := time.NewTicker(checkSubAvailabilitySeconds)
+	ticker := time.NewTicker(checkSubAvailabilitySeconds * time.Second)
 	defer ticker.Stop()
 
 	isFound := make(chan bool, 1)

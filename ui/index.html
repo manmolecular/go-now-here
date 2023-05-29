@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat with a random person</title>
+</head>
+<style>
+    label, span {
+        display: block;
+        font: 1rem 'Fira Sans', sans-serif;
+    }
+
+    input,
+    label {
+        margin: 0.4rem 0;
+    }
+</style>
+<script>
+    function writeMessageToHistory(message, direction) {
+        let span = document.createElement("span");
+        span.textContent = `${direction} ${message}`;
+        document.getElementById("message-history").appendChild(span);
+    }
+
+    window.addEventListener("DOMContentLoaded", function() {
+        let socket = new WebSocket("ws://localhost:3000/v1/ws/chat");
+
+        // Connection opened
+        socket.addEventListener("open", (event) => {
+            document.getElementById("message-form").addEventListener("submit", function(e) {
+                e.preventDefault();
+                let msg = document.getElementById("message").value;
+                socket.send(`{"message": "${msg}"}`);
+                writeMessageToHistory(msg, ">>");
+                document.getElementById("message").value = '';
+            });
+        });
+
+        // Listen for messages
+        socket.addEventListener("message", (event) => {
+            console.log("Received message from server ", event.data);
+            writeMessageToHistory(JSON.parse(event.data).message, "<<");
+        });
+    });
+</script>
+<body>
+    <label for="message-history">Messages:</label>
+    <div id="message-history">
+
+    </div>
+    <form id="message-form">
+        <label for="message">Your message:</label>
+        <input type="text" id="message" name="message" required minlength="1" maxlength="140" size="10">
+        <input type="submit" value="send">
+    </form>
+</body>
+</html>

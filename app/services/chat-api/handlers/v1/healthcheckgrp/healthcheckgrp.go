@@ -1,5 +1,5 @@
-// Package healthcheck maintains the group of handlers for health checking.
-package healthcheck
+// Package healthcheckgrp maintains the group of handlers for health checking.
+package healthcheckgrp
 
 import (
 	"context"
