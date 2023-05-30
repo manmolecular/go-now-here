@@ -3,7 +3,7 @@ package handlers
 
 import (
 	v1 "github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1"
-	"github.com/manmolecular/go-now-here/kit/middleware"
+	"github.com/manmolecular/go-now-here/business/web/v1/mid"
 	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"
 	"net/http"
@@ -28,9 +28,9 @@ func APIMux(cfg APIMuxConfig, options ...func(opts *Options)) http.Handler {
 	app := web.NewApp(
 		cfg.Shutdown,
 		nil,
-		middleware.Logger(cfg.Log),
-		middleware.Errors(cfg.Log),
-		middleware.Panics(),
+		mid.Logger(cfg.Log),
+		mid.Errors(cfg.Log),
+		mid.Panics(),
 	)
 
 	v1.Routes(app, v1.Config{

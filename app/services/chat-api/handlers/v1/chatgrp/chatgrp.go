@@ -255,7 +255,7 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 	}()
 }
 
-// getSubscriberId generates subscriber identifier as sha1 hex digest
+// getSubscriberId generates subscriber identifier as sha1 hex digest.
 func (h *Handlers) getSubscriberId(content string) string {
 	hash := sha1.New()
 	hash.Write([]byte(content))
@@ -264,7 +264,7 @@ func (h *Handlers) getSubscriberId(content string) string {
 	return hex.EncodeToString(shaSum)
 }
 
-// Subscribe subscribes a client to the message channel to read and write messages from it
+// Subscribe subscribes a client to the message channel to read and write messages from it.
 func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
