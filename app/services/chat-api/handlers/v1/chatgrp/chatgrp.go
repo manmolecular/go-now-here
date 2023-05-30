@@ -3,6 +3,8 @@ package chatgrp
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
@@ -14,8 +16,21 @@ import (
 	"time"
 )
 
+// Common errors
 const (
 	searchPairTimeoutError = "pair search time out reached: pair can not be found"
+)
+
+// Possible senders
+const (
+	fromServiceName  = "service"
+	fromStrangerName = "stranger"
+)
+
+// Notification statuses
+const (
+	statusOk    = "ok"
+	statusError = "error"
 )
 
 const (
@@ -38,6 +53,8 @@ const (
 // message represents a message.
 type message struct {
 	Content string `json:"content"`
+	From    string `json:"from"`
+	Status  string `json:"status"`
 }
 
 // subscriber represents a subscriber.
@@ -95,8 +112,8 @@ func (h *Handlers) publishMessage(msg *message, s *subscriber) error {
 }
 
 // notifySubscriber notifies subscriber directly about service state changes.
-func (h *Handlers) notifySubscriber(ctx context.Context, conn *websocket.Conn, sId string, content string) {
-	msg := &message{Content: content}
+func (h *Handlers) notifySubscriber(ctx context.Context, conn *websocket.Conn, sId, content, status string) {
+	msg := &message{Content: content, From: fromServiceName, Status: status}
 	if err := wsjson.Write(ctx, conn, msg); err != nil {
 		h.log.Warnw("subscriber can not be notified due to error", "subscriberId", sId, "error", err)
 	}
@@ -174,7 +191,7 @@ func (h *Handlers) addSubscriber(s *subscriber) {
 func (h *Handlers) deleteSubscriber(s *subscriber) {
 	h.subscribersMu.Lock()
 	delete(h.subscribers, s.id)
-	defer h.subscribersMu.Unlock()
+	h.subscribersMu.Unlock()
 }
 
 // readMessages reads messages from a subscriber connection and publishes them to the message channel.
@@ -204,6 +221,8 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 
 				h.log.Debugw("successfully read the message from a subscriber", "subscriberId", s.id, "message", msg)
 
+				msg.From = fmt.Sprintf("%s-%s", fromStrangerName, s.id[:3])
+				msg.Status = statusOk
 				if err := h.publishMessage(msg, s); err != nil {
 					// Skip the message if it can not be published or processed; take the next one
 					h.log.Warnw("message can not be published due to error", "subscriberId", s.id, "error", err)
@@ -236,6 +255,15 @@ func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *s
 	}()
 }
 
+// getSubscriberId generates subscriber identifier as sha1 hex digest
+func (h *Handlers) getSubscriberId(content string) string {
+	hash := sha1.New()
+	hash.Write([]byte(content))
+	shaSum := hash.Sum(nil)
+
+	return hex.EncodeToString(shaSum)
+}
+
 // Subscribe subscribes a client to the message channel to read and write messages from it
 func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	conn, err := websocket.Accept(w, r, nil)
@@ -250,20 +278,20 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	}()
 
 	s := &subscriber{
-		id:       r.RemoteAddr,
+		id:       h.getSubscriberId(r.RemoteAddr),
 		messages: make(chan *message, h.subscriberMessageBuffer),
 	}
 
 	h.addSubscriber(s)
 	defer h.deleteSubscriber(s)
 
-	h.notifySubscriber(ctx, conn, s.id, "wait for any available subscriber to chat with...")
+	h.notifySubscriber(ctx, conn, s.id, "wait for any available subscriber to chat with...", statusOk)
 
 	// Assign a subscriber pair to chat with.
 	// When pair is successfully assigned, we can read messages from the pair and write messages to the pair
 	if err = h.assignSubscriber(ctx, s); err != nil {
 		h.log.Debugw("no available subscribers", "subscriberId", s.id, "error", err)
-		h.notifySubscriber(ctx, conn, s.id, "no available subscribers; please, try again later.")
+		h.notifySubscriber(ctx, conn, s.id, "no available subscribers; please, try again later.", statusError)
 
 		if err = conn.Close(websocket.StatusTryAgainLater, "no available subscribers"); err != nil {
 			h.log.Warnw("socket connection can not be closed", "subscriberId", s.id, "error", err)
@@ -272,7 +300,7 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
-	h.notifySubscriber(ctx, conn, s.id, "subscriber is found. Say Hi!")
+	h.notifySubscriber(ctx, conn, s.id, "subscriber is found. Say Hi!", statusOk)
 
 	// Read messages in a goroutine, ctx will be canceled if client closed the connection
 	ctx = h.readMessages(ctx, conn, s)
