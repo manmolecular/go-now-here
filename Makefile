@@ -8,4 +8,4 @@ tidy:
 	go mod tidy
 
 fmt:
-	gofmt -s -w app business kit
+	gofmt -s -w .

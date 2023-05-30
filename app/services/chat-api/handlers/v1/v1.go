@@ -6,6 +6,7 @@ import (
 	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/chatgrp"
 	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/healthcheckgrp"
 	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/uigrp"
+	"github.com/manmolecular/go-now-here/business/core/subscriber"
 	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"
 	"net/http"
@@ -21,7 +22,7 @@ func Routes(app *web.App, cfg Config) {
 	const version = "v1"
 
 	healthcheck := healthcheckgrp.New(cfg.Log)
-	chat := chatgrp.New(cfg.Log)
+	chat := chatgrp.New(cfg.Log, subscriber.NewSubscribersPool(cfg.Log))
 	ui := uigrp.New(cfg.Log)
 
 	app.Handle(http.MethodGet, version, "/liveness", healthcheck.Liveness)
