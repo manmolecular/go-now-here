@@ -243,7 +243,11 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 		return err
 	}
 
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() {
+		if err = conn.Close(websocket.StatusNormalClosure, ""); err != nil {
+			h.log.Warnw("socket connection can not be closed", "error", err)
+		}
+	}()
 
 	s := &subscriber{
 		id:       r.RemoteAddr,
@@ -273,10 +277,10 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	// Read messages in a goroutine, ctx will be canceled if client closed the connection
 	ctx = h.readMessages(ctx, conn, s)
 
-	// Write messages to a client from the message channel in goroutine
+	// Write messages to a client from the message channel in goroutine until the read context is done
 	h.writeMessages(ctx, conn, s)
 
-	// Block handler while reader and writer goroutines are performing operations
+	// Block handler while reader and writer goroutines are performing operations until the read context is done
 	select {
 	case <-ctx.Done():
 		h.log.Debugw("client closed the connection", "subscriberId", s.id)
