@@ -23,15 +23,17 @@ func GenerateSubscriberId(content string) string {
 // Subscriber holds a link with another subscriber which is connected to the current one.
 // Messages are sent on the Messages channel and can be represented as message.Message type.
 type Subscriber struct {
-	Id       string
-	PairId   string
-	Messages chan *message.Message
+	Id               string
+	PairId           string
+	PairDisconnected chan bool
+	Messages         chan *message.Message
 }
 
 // NewSubscriber constructs a new subscriber using idContent as a content for ID generation
 func NewSubscriber(idContent string) *Subscriber {
 	return &Subscriber{
-		Id:       GenerateSubscriberId(idContent),
-		Messages: make(chan *message.Message, bufferMaxMessages),
+		Id:               GenerateSubscriberId(idContent),
+		PairDisconnected: make(chan bool, 1),
+		Messages:         make(chan *message.Message, bufferMaxMessages),
 	}
 }

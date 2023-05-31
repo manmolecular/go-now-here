@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
+	"time"
 )
 
 // Available sender names
@@ -24,6 +25,8 @@ const (
 	statusOk    = "ok"
 	statusError = "error"
 )
+
+const readMessagesIntervalMilliseconds = 100
 
 // Handlers manages the set of chat endpoints.
 type Handlers struct {
@@ -52,7 +55,7 @@ func (h *Handlers) read(ctx context.Context, conn *websocket.Conn, s *subscriber
 	ctx, cancel := context.WithCancel(ctx)
 
 	go func() {
-		for {
+		for range time.Tick(readMessagesIntervalMilliseconds * time.Millisecond) {
 			select {
 			case <-ctx.Done():
 				h.log.Debugw("read context is done", "subscriberId", s.Id)
@@ -63,6 +66,13 @@ func (h *Handlers) read(ctx context.Context, conn *websocket.Conn, s *subscriber
 					// Stop the read and write context if subscriber is closed the connection
 					if errors.As(err, &websocket.CloseError{}) {
 						h.log.Warnw("message can not be read, subscriber closed the connection", "subscriberId", s.Id)
+						cancel()
+						return
+					}
+
+					// Check if the client closed the connection unexpectedly, no exact error - reader is not available
+					if _, _, err = conn.Reader(ctx); err != nil {
+						h.log.Warnw("message can not be read, subscriber unexpectedly closed the connection", "subscriberId", s.Id)
 						cancel()
 						return
 					}
@@ -87,7 +97,9 @@ func (h *Handlers) read(ctx context.Context, conn *websocket.Conn, s *subscriber
 }
 
 // write writes messages from the message channel to the subscriber connection.
-func (h *Handlers) write(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) {
+func (h *Handlers) write(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+
 	go func() {
 		for {
 			select {
@@ -98,12 +110,19 @@ func (h *Handlers) write(ctx context.Context, conn *websocket.Conn, s *subscribe
 					continue
 				}
 				h.log.Debugw("successfully wrote message to a subscriber", "subscriberId", s.Id, "message", msg)
+			case <-s.PairDisconnected:
+				// Start over, subscriber pair is disconnected and chat is no longer possible
+				h.notify(ctx, conn, s.Id, "subscriber disconnected.", statusOk)
+				h.log.Warnw("subscriber pair is disconnected", "subscriberId", s.Id)
+				cancel()
 			case <-ctx.Done():
 				h.log.Debugw("write context is done", "subscriberId", s.Id)
 				return
 			}
 		}
 	}()
+
+	return ctx
 }
 
 // Subscribe subscribes a client to the message channel to read and write messages from it.
@@ -145,7 +164,7 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	ctx = h.read(ctx, conn, s)
 
 	// Write messages to a client from the message channel in goroutine until the read context is done
-	h.write(ctx, conn, s)
+	ctx = h.write(ctx, conn, s)
 
 	// Block handler while reader and writer goroutines are performing operations until the read context is done
 	select {

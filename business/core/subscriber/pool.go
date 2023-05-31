@@ -31,16 +31,15 @@ const (
 const searchPairTimeoutError = "pair search time out reached: pair can not be found"
 
 type SubscribersPool struct {
-	log *zap.SugaredLogger
-
-	// SubscriberMessageBuffer controls the max number of messages that can be queued for a subscriber.
-	SubscriberMessageBuffer int
-
+	log           *zap.SugaredLogger
 	subscribersMu sync.Mutex
-	Subscribers   map[string]*Subscriber
 
 	// publishLimiter controls the rate limit applied to the publishMessage function.
 	publishLimiter *rate.Limiter
+
+	// SubscriberMessageBuffer controls the max number of messages that can be queued for a subscriber.
+	SubscriberMessageBuffer int
+	Subscribers             map[string]*Subscriber
 }
 
 // NewSubscribersPool constructs a pool of subscribers.
@@ -98,8 +97,12 @@ func (s *SubscribersPool) AddSubscriber(sub *Subscriber) {
 // DeleteSubscriber deletes the given subscriber from the pool.
 func (s *SubscribersPool) DeleteSubscriber(sub *Subscriber) {
 	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	sPair, ok := s.Subscribers[sub.PairId]
+	if ok {
+		sPair.PairDisconnected <- true
+	}
 	delete(s.Subscribers, sub.Id)
-	s.subscribersMu.Unlock()
 }
 
 // AssignSubscriber assigns an available subscriber to a newcomer subscriber.
