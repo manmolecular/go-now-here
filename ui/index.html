@@ -45,7 +45,7 @@
 
 </style>
 <script>
-    const scrollToBottom = (id) => {
+    function scrollToBottom(id)  {
         const element = document.getElementById(id);
         element.scrollTop = element.scrollHeight;
     }
@@ -61,23 +61,33 @@
     window.addEventListener("DOMContentLoaded", function() {
         let socket = new WebSocket("ws://localhost:3000/v1/ws/chat");
 
-        // Connection opened
-        socket.addEventListener("open", (event) => {
+        socket.onopen = (_) => {
             document.getElementById("message-form").addEventListener("submit", function(e) {
                 e.preventDefault();
-                let msg = document.getElementById("message").value;
-                socket.send(`{"content": "${msg}"}`);
-                writeMessageToHistory(msg, "you");
-                document.getElementById("message").value = '';
-            });
-        });
 
-        // Listen for messages
-        socket.addEventListener("message", (event) => {
-            console.log("Received message from server ", event.data);
-            let message = JSON.parse(event.data)
+                let content = document.getElementById("message").value;
+                let msg = JSON.stringify({"content": content})
+                socket.send(msg);
+
+                document.getElementById("message").value = '';
+                writeMessageToHistory(content, "you");
+            });
+        };
+
+        socket.onmessage = (e) => {
+            console.log("Received message from the server ", e.data);
+            let message = JSON.parse(e.data)
             writeMessageToHistory(message.content, message.from);
-        });
+        };
+
+        socket.onclose = (e) => {
+            writeMessageToHistory("retry attempt will be made in 5 sec...", "service")
+            setTimeout(() => { location.reload() }, 5_000);
+        };
+
+        socket.onerror = (e) => {
+            writeMessageToHistory("error occurred", "service")
+        };
     });
 </script>
 <body>

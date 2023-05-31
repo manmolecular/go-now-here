@@ -23,8 +23,8 @@ const (
 	// checkSubAvailabilityMilliseconds defines rate of available subscribers checking interval
 	checkSubAvailabilityMilliseconds = 500
 
-	// checkSubAvailabilityMaxTimeSeconds defines how long can we wait for an available subscriber
-	checkSubAvailabilityMaxTimeSeconds = 60
+	// CheckSubAvailabilityMaxTimeSeconds defines how long can we wait for an available subscriber
+	CheckSubAvailabilityMaxTimeSeconds = 10
 )
 
 // searchPairTimeoutError represents search pair error
@@ -144,7 +144,7 @@ func (s *SubscribersPool) AssignSubscriber(sub *Subscriber) error {
 	case <-isFound:
 		s.log.Debugw("pair found", "subscriberId", sub.Id, "pairId", sub.PairId)
 		return nil
-	case <-time.After(checkSubAvailabilityMaxTimeSeconds * time.Second):
+	case <-time.After(CheckSubAvailabilityMaxTimeSeconds * time.Second):
 		s.log.Debugw(searchPairTimeoutError, "subscriberId", sub.Id)
 		return errors.New(searchPairTimeoutError)
 	}

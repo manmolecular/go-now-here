@@ -15,8 +15,8 @@ import (
 
 // Available sender names
 const (
-	fromServiceName  = "service"
-	fromStrangerName = "stranger"
+	fromService    = "service"
+	fromSubscriber = "stranger"
 )
 
 // Notification statuses
@@ -27,28 +27,28 @@ const (
 
 // Handlers manages the set of chat endpoints.
 type Handlers struct {
-	log         *zap.SugaredLogger
-	subscribers *subscriber.SubscribersPool
+	log  *zap.SugaredLogger
+	pool *subscriber.SubscribersPool
 }
 
 // New constructs a Handlers api for the chat group.
 func New(log *zap.SugaredLogger, subscribers *subscriber.SubscribersPool) *Handlers {
 	return &Handlers{
-		log:         log,
-		subscribers: subscribers,
+		log:  log,
+		pool: subscribers,
 	}
 }
 
-// notifySubscriber notifies subscriber directly about service state changes.
-func (h *Handlers) notifySubscriber(ctx context.Context, conn *websocket.Conn, sId, content, status string) {
-	msg := message.NewMessage(content, fromServiceName, status)
+// notify notifies subscriber directly about service state changes.
+func (h *Handlers) notify(ctx context.Context, conn *websocket.Conn, sId, content, status string) {
+	msg := message.NewMessage(content, fromService, status)
 	if err := wsjson.Write(ctx, conn, msg); err != nil {
-		h.log.Warnw("subscriber can not be notified due to error", "subscriberId", sId, "error", err)
+		h.log.Warnw("client can not be notified due to error", "subscriberId", sId, "error", err)
 	}
 }
 
-// readMessages reads messages from a subscriber connection and publishes them to the message channel.
-func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) context.Context {
+// read reads messages from a subscriber connection and publishes them to the message channel.
+func (h *Handlers) read(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 
 	go func() {
@@ -58,7 +58,7 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 				h.log.Debugw("read context is done", "subscriberId", s.Id)
 				return
 			default:
-				msg := message.NewMessage("", fmt.Sprintf("%s-%s", fromStrangerName, s.Id[:3]), statusOk)
+				msg := message.NewMessage("", fmt.Sprintf("%s-%s", fromSubscriber, s.Id[:3]), statusOk)
 				if err := wsjson.Read(ctx, conn, &msg); err != nil {
 					// Stop the read and write context if subscriber is closed the connection
 					if errors.As(err, &websocket.CloseError{}) {
@@ -74,7 +74,7 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 
 				h.log.Debugw("successfully read the message from a subscriber", "subscriberId", s.Id, "message", msg)
 
-				if err := h.subscribers.PublishMessage(msg, s); err != nil {
+				if err := h.pool.PublishMessage(msg, s); err != nil {
 					// Skip the message if it can not be published or processed; take the next one
 					h.log.Warnw("message can not be published due to error", "subscriberId", s.Id, "error", err)
 					continue
@@ -86,8 +86,8 @@ func (h *Handlers) readMessages(ctx context.Context, conn *websocket.Conn, s *su
 	return ctx
 }
 
-// writeMessages writes messages from the message channel to the subscriber connection.
-func (h *Handlers) writeMessages(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) {
+// write writes messages from the message channel to the subscriber connection.
+func (h *Handlers) write(ctx context.Context, conn *websocket.Conn, s *subscriber.Subscriber) {
 	go func() {
 		for {
 			select {
@@ -121,16 +121,16 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 
 	s := subscriber.NewSubscriber(r.RemoteAddr)
 
-	h.subscribers.AddSubscriber(s)
-	defer h.subscribers.DeleteSubscriber(s)
+	h.pool.AddSubscriber(s)
+	defer h.pool.DeleteSubscriber(s)
 
-	h.notifySubscriber(ctx, conn, s.Id, "wait for any available subscriber to chat with...", statusOk)
+	h.notify(ctx, conn, s.Id, fmt.Sprintf("wait %d sec. for available subscriber to chat with...", subscriber.CheckSubAvailabilityMaxTimeSeconds), statusOk)
 
 	// Assign a subscriber pair to chat with.
 	// When pair is successfully assigned, we can read messages from the pair and write messages to the pair
-	if err = h.subscribers.AssignSubscriber(s); err != nil {
+	if err = h.pool.AssignSubscriber(s); err != nil {
 		h.log.Debugw("no available subscribers", "subscriberId", s.Id, "error", err)
-		h.notifySubscriber(ctx, conn, s.Id, "no available subscribers; please, try again later.", statusError)
+		h.notify(ctx, conn, s.Id, "no available subscribers.", statusError)
 
 		if err = conn.Close(websocket.StatusTryAgainLater, "no available subscribers"); err != nil {
 			h.log.Warnw("socket connection can not be closed", "subscriberId", s.Id, "error", err)
@@ -139,13 +139,13 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
-	h.notifySubscriber(ctx, conn, s.Id, "subscriber is found. Say Hi!", statusOk)
+	h.notify(ctx, conn, s.Id, "subscriber is found.", statusOk)
 
 	// Read messages in a goroutine, ctx will be canceled if client closed the connection
-	ctx = h.readMessages(ctx, conn, s)
+	ctx = h.read(ctx, conn, s)
 
 	// Write messages to a client from the message channel in goroutine until the read context is done
-	h.writeMessages(ctx, conn, s)
+	h.write(ctx, conn, s)
 
 	// Block handler while reader and writer goroutines are performing operations until the read context is done
 	select {
