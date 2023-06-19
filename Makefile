@@ -10,8 +10,8 @@ stop:
 	docker compose stop api
 
 delete: stop
-	docker rm go-now-here-api
-	docker rmi go-now-here/api
+	-docker rm go-now-here-api
+	-docker rmi go-now-here/api
 
 prune: delete
 
