@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/chatgrp"
-	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/healthcheckgrp"
-	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1/uigrp"
+	"github.com/manmolecular/go-now-here/app/services/api/handlers/v1/chatgrp"
+	"github.com/manmolecular/go-now-here/app/services/api/handlers/v1/healthcheckgrp"
+	"github.com/manmolecular/go-now-here/app/services/api/handlers/v1/uigrp"
 	"github.com/manmolecular/go-now-here/business/core/subscriber"
 	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"

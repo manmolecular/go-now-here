@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ardanlabs/conf/v3"
-	"github.com/manmolecular/go-now-here/app/services/chat-api/handlers"
+	"github.com/manmolecular/go-now-here/app/services/api/handlers"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const prefix = "chat"
+const prefix = "api"
 
 func main() {
 	logConfig := zap.NewDevelopmentConfig()

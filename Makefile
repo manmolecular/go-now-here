@@ -15,10 +15,10 @@ delete: stop
 prune: delete
 
 run_api:
-	go run ./app/services/chat-api/main.go
+	go run ./app/services/api/main.go
 
 build_api:
-	go build -o api ./app/services/chat-api/.
+	go build -o api ./app/services/api/.
 
 tidy:
 	go mod tidy

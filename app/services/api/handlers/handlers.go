@@ -2,7 +2,7 @@
 package handlers
 
 import (
-	v1 "github.com/manmolecular/go-now-here/app/services/chat-api/handlers/v1"
+	v1 "github.com/manmolecular/go-now-here/app/services/api/handlers/v1"
 	"github.com/manmolecular/go-now-here/business/web/v1/mid"
 	"github.com/manmolecular/go-now-here/kit/web"
 	"go.uber.org/zap"

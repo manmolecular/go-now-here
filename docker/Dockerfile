@@ -4,7 +4,7 @@ LABEL service="go-now-here"
 WORKDIR /build
 COPY . .
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux go build -o ./out/api ./app/services/chat-api
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./out/api ./app/services/api
 
 FROM alpine:3.18 AS bin
 COPY --from=build /build/out/api /app/api
