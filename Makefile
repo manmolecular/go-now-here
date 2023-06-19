@@ -1,3 +1,6 @@
+include .env.dev
+export
+
 build:
 	docker compose build
 
@@ -36,3 +39,5 @@ fmt:
 
 lint:
 	golangci-lint run
+
+.PHONY: all $(MAKECMDGOALS)

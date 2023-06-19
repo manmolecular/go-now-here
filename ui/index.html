@@ -59,7 +59,7 @@
     }
 
     window.addEventListener("DOMContentLoaded", function() {
-        let socket = new WebSocket("ws://localhost:8000/v1/ws/chat");
+        let socket = new WebSocket(`ws://${window.location.host}/v1/ws/chat`);
 
         socket.onopen = (_) => {
             document.getElementById("message-form").addEventListener("submit", function(e) {
