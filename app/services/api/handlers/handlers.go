@@ -30,6 +30,7 @@ func APIMux(cfg APIMuxConfig, options ...func(opts *Options)) http.Handler {
 		nil,
 		mid.Logger(cfg.Log),
 		mid.Errors(cfg.Log),
+		mid.Cors("*"),
 		mid.Panics(),
 	)
 

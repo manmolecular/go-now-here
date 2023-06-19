@@ -127,7 +127,10 @@ func (h *Handlers) write(ctx context.Context, conn *websocket.Conn, s *subscribe
 
 // Subscribe subscribes a client to the message channel to read and write messages from it.
 func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	conn, err := websocket.Accept(w, r, nil)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		OriginPatterns: []string{"*"},
+	})
+
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,9 @@ run:
 
 up: run
 
+logs:
+	docker compose logs -f api
+
 stop:
 	docker compose stop api
 
