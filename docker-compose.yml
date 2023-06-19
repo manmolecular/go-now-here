@@ -12,5 +12,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    environment:
+      CHAT_WEB_READ_TIMEOUT: ${CHAT_WEB_READ_TIMEOUT:-5s}
+      CHAT_WEB_WRITE_TIMEOUT: ${CHAT_WEB_WRITE_TIMEOUT:-10s}
+      CHAT_WEB_IDLE_TIMEOUT: ${CHAT_WEB_IDLE_TIMEOUT:-600s}
+      CHAT_WEB_SHUTDOWN_TIMEOUT: ${CHAT_WEB_SHUTDOWN_TIMEOUT:-10s}
+      CHAT_WEB_API_HOST: ${CHAT_WEB_API_HOST:-0.0.0.0:8000}
     ports:
       - "8000:8000"
