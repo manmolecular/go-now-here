@@ -1,6 +1,8 @@
 include .env.dev
 export
 
+default: build run logs
+
 build:
 	docker compose build
 
@@ -40,4 +42,4 @@ fmt:
 lint:
 	golangci-lint run
 
-.PHONY: all $(MAKECMDGOALS)
+.PHONY: default $(MAKECMDGOALS)
