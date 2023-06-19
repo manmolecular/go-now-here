@@ -1,0 +1,16 @@
+name: go-now-here
+
+services:
+  api:
+    container_name: go-now-here-api
+    image: go-now-here/api:0.1.0
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    healthcheck:
+      test: curl --insecure --fail -s http://localhost:8000/v1/liveness || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "8000:8000"
