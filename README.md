@@ -1,5 +1,8 @@
 # go-now-here
 No(w)here - chat now & here with a random person.  
+
+## Screenshot
+User interface:
 ![image](assets/main_page.png)
 
 ## Description
