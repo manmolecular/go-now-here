@@ -32,4 +32,4 @@ vendor: tidy
 	go mod vendor
 
 fmt:
-	gofmt -s -w .
+	go fmt ./...
