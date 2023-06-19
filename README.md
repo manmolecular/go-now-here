@@ -1,5 +1,6 @@
 # go-now-here
-No(w)here - chat now & here with a random person.
+No(w)here - chat now & here with a random person.  
+![image](assets/main_page.png)
 
 ## Description
 This project is a simple WebSocket-based chat where your messages are sent only to one randomly selected person from the pool of available connections. Simply put, it is a chat with a randomly assigned person.
