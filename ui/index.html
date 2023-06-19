@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chat with a random person</title>
+    <title>No(w)here</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Indie+Flower">
 </head>
 <style>
@@ -75,7 +75,6 @@
         };
 
         socket.onmessage = (e) => {
-            console.log("Received message from the server ", e.data);
             let message = JSON.parse(e.data)
             writeMessageToHistory(message.content, message.from);
         };
