@@ -11,8 +11,7 @@ const uiFilePath = "./ui/index.html"
 
 // Handlers manages the set of UI endpoints.
 type Handlers struct {
-	log          *zap.SugaredLogger
-	staticServer http.Handler
+	log *zap.SugaredLogger
 }
 
 // New constructs a Handlers api for the UI group.

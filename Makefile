@@ -33,3 +33,6 @@ vendor: tidy
 
 fmt:
 	go fmt ./...
+
+lint:
+	golangci-lint run

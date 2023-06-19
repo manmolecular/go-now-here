@@ -55,7 +55,10 @@ func (h *Handlers) read(ctx context.Context, conn *websocket.Conn, s *subscriber
 	ctx, cancel := context.WithCancel(ctx)
 
 	go func() {
-		for range time.Tick(readMessagesIntervalMilliseconds * time.Millisecond) {
+		ticker := time.NewTicker(readMessagesIntervalMilliseconds * time.Millisecond)
+		defer ticker.Stop()
+
+		for range ticker.C {
 			select {
 			case <-ctx.Done():
 				h.log.Debugw("read context is done", "subscriberId", s.Id)
@@ -170,10 +173,8 @@ func (h *Handlers) Subscribe(ctx context.Context, w http.ResponseWriter, r *http
 	ctx = h.write(ctx, conn, s)
 
 	// Block handler while reader and writer goroutines are performing operations until the read context is done
-	select {
-	case <-ctx.Done():
-		h.log.Debugw("client closed the connection", "subscriberId", s.Id)
-	}
+	<-ctx.Done()
+	h.log.Debugw("client closed the connection", "subscriberId", s.Id)
 
 	return nil
 }

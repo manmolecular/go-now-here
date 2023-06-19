@@ -25,13 +25,13 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	defer log.Sync()
+	defer log.Sync() // nolint:errcheck
 
 	sugaredLog := log.Sugar()
 
 	if err := run(sugaredLog); err != nil {
 		sugaredLog.Errorw("startup error", "error", err)
-		sugaredLog.Sync()
+		sugaredLog.Sync() // nolint:errcheck
 		os.Exit(1)
 	}
 }
