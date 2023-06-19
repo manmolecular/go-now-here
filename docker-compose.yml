@@ -3,7 +3,7 @@ name: go-now-here
 services:
   api:
     container_name: go-now-here-api
-    image: go-now-here/api:0.1.0
+    image: go-now-here/api
     build:
       context: .
       dockerfile: docker/Dockerfile

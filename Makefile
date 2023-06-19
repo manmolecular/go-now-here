@@ -11,6 +11,7 @@ stop:
 
 delete: stop
 	docker rm go-now-here-api
+	docker rmi go-now-here/api
 
 prune: delete
 
@@ -24,6 +25,7 @@ tidy:
 	go mod tidy
 
 vendor: tidy
+	rm -rf vendor
 	go mod vendor
 
 fmt:

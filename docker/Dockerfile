@@ -8,20 +8,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o ./out/api ./app/services/api
 
 FROM alpine:3.18 AS bin
 COPY --from=build /build/out/api /app/api
+COPY ui /app/ui
 
-EXPOSE 8000
-
-WORKDIR /app
-
-RUN apk update                                                         && \
-    apk add --no-cache                                                    \
-      curl                                                                \
+RUN apk update                                && \
+    apk add --no-cache                           \
+      curl                                       \
       bash
 
-RUN adduser --disabled-password -s /bin/bash api                       && \
-    chown api /app
+RUN addgroup -g 1000 -S api                   && \
+    adduser -u 1000 -h /app -G api -S api
 
-COPY ui ui
+WORKDIR /app
 
 USER api
 
