@@ -27,7 +27,7 @@ run_api:
 	go run ./app/services/api/main.go
 
 build_api:
-	go build -o api ./app/services/api/.
+	go build -mod vendor -o api ./app/services/api/.
 
 tidy:
 	go mod tidy

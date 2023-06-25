@@ -3,7 +3,7 @@ LABEL service="go-now-here"
 
 WORKDIR /build
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o ./out/api ./app/services/api
+RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -o ./out/api ./app/services/api
 
 FROM alpine:3.18 AS bin
 COPY --from=build /build/out/api /app/api
