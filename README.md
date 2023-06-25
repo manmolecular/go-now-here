@@ -20,11 +20,11 @@ One of:
 ## Run
 Perform one of the following commands:
 ```
-make        # build, run and attack to logs
-make build  # to build Docker image
+make        # build with Docker, run and attach to logs
+make build  # to build a Docker image
 make run    # to run the application using "docker compose"
 make stop   # to stop the appllication
-make delete # to delete container with the application
+make delete # to delete a container with the application
 ```
 In your browser:
 ```
