@@ -18,7 +18,7 @@ import (
 const prefix = "api"
 
 func main() {
-	logConfig := zap.NewDevelopmentConfig()
+	logConfig := zap.NewProductionConfig()
 	logConfig.DisableStacktrace = true
 	log, err := logConfig.Build(zap.WithCaller(true))
 	if err != nil {

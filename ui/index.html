@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>No(w)here</title>
+    <title>Now & here</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Indie+Flower">
 </head>
 <style>
@@ -45,47 +45,54 @@
 
 </style>
 <script>
-    function scrollToBottom(id)  {
+    const reloadTimeout = 5_000;  // milliseconds
+    const serviceSenderName = "service";  // name that will be shown on service messages as author
+    const clientSenderName = "you";  // name that will be shown on your own message as author
+    const messageHistoryElementID = "message-history";  // main container with messages ID
+
+    function scrollToBottom(id = messageHistoryElementID)  {
         const element = document.getElementById(id);
         element.scrollTop = element.scrollHeight;
     }
 
-    function writeMessageToHistory(message, from) {
+    // writeMessageToHistory
+    function writeMessageToHistory(message, from = serviceSenderName) {
         let span = document.createElement("span");
         span.textContent = `${from}: ${message}`;
 
         document.getElementById("message-history").appendChild(span);
-        scrollToBottom("message-history")
+        scrollToBottom();
     }
 
     window.addEventListener("DOMContentLoaded", function() {
-        let socket = new WebSocket(`ws://${window.location.host}/v1/ws/chat`);
+        let host = window.location.host;
+        let socket = new WebSocket(`ws://${host}/v1/ws/chat`);
 
         socket.onopen = (_) => {
             document.getElementById("message-form").addEventListener("submit", function(e) {
                 e.preventDefault();
 
                 let content = document.getElementById("message").value;
-                let msg = JSON.stringify({"content": content})
+                let msg = JSON.stringify({"content": content});
                 socket.send(msg);
 
                 document.getElementById("message").value = '';
-                writeMessageToHistory(content, "you");
+                writeMessageToHistory(content, clientSenderName);
             });
         };
 
         socket.onmessage = (e) => {
-            let message = JSON.parse(e.data)
+            let message = JSON.parse(e.data);
             writeMessageToHistory(message.content, message.from);
         };
 
         socket.onclose = (e) => {
-            writeMessageToHistory("retry attempt will be made in 5 sec...", "service")
-            setTimeout(() => { location.reload() }, 5_000);
+            writeMessageToHistory("retry attempt will be made in 5 sec...");
+            setTimeout(() => { location.reload() }, reloadTimeout);
         };
 
         socket.onerror = (e) => {
-            writeMessageToHistory("error occurred", "service")
+            writeMessageToHistory("error occurred");
         };
     });
 </script>
