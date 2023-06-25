@@ -17,6 +17,8 @@ One of:
 - Go (tested on 1.20) to build and run natively
 - Docker (tested on 20.10) and Docker Compose (tested on 2.17) to run in docker
 
+Note for macOS: ensure that `"Use Docker Compose V2"` flag is enabled in `Preferences`
+
 ## Run
 Perform one of the following commands:
 ```
